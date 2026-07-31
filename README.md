@@ -122,7 +122,7 @@ Supported Intent Types:
 
 ### Workflow
 
-> Add a screenshot of the complete n8n workflow.
+![Workflow](screenshots/workflow.png)
 
 ```
 screenshots/workflow.png
@@ -130,7 +130,7 @@ screenshots/workflow.png
 
 ### Conversations Table
 
-> Add a screenshot of the Airtable Conversations table.
+![Airtbale](screenshots/conversation-table.png)
 
 ```
 screenshots/conversations-table.png
@@ -138,7 +138,7 @@ screenshots/conversations-table.png
 
 ### Workflow Executions
 
-> Add a screenshot of the execution logs.
+![Airtable](screenshots/workflow-executions.png)
 
 ```
 screenshots/workflow-executions.png
