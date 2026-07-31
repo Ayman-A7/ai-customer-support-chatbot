@@ -1,0 +1,789 @@
+{
+  "name": "AI Customer Support Chatbot",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "customer-support",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -144,
+        128
+      ],
+      "id": "da634e67-3cb2-4d12-b261-07583166aaee",
+      "name": "01 - Receive Customer Message",
+      "webhookId": "acbd8c4e-06ed-445f-a06d-08a226ae9986"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "5ab40052-7c86-499c-8110-180ce96f3c1a",
+              "leftValue": "={{ $json.body.name }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "ecfc5f3e-8aa4-45a1-aa6b-96153d04fb97",
+              "leftValue": "={{ $json.body.email }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "e42a4018-b8d1-4308-9fc0-c10a434d8c10",
+              "leftValue": "={{ $json.body.message }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        80,
+        128
+      ],
+      "id": "a4468563-de0c-4abf-af75-effa9440729d",
+      "name": "02 - Validate Request"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f0dbf303-0987-4cc8-b697-6ec32a87beb1",
+              "name": "customerName",
+              "value": "={{ $json.body.name.trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "2d58fccb-6c1c-4a80-8f56-3a80721ee721",
+              "name": "email",
+              "value": "={{ $json.body.email.trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "254c16a9-087f-4277-9794-f738d554555a",
+              "name": "phone",
+              "value": "={{ $json.body.phone }}",
+              "type": "string"
+            },
+            {
+              "id": "eb15a3af-88ae-49c8-96a9-dfa623dffb8e",
+              "name": "receivedAt",
+              "value": "={{$now}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        304,
+        32
+      ],
+      "id": "bc235f32-2b8d-46b0-a4a7-7667b08c935e",
+      "name": "03 - Clean Customer Data"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "73981784-fcaf-48c5-b102-2b951b2217ef",
+              "name": "conversationId",
+              "value": "={{ 'CONV-' + Date.now() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        528,
+        32
+      ],
+      "id": "610e633b-7636-41ba-8f7d-8b67a6a4fdf5",
+      "name": "04 - Generate Conversation ID"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        832,
+        256
+      ],
+      "id": "760781cb-b676-42c1-ae65-404ab8f529fd",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "WrbY98auAVWVuuZ6",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are an AI customer support assistant.\n\nCustomer Details\n\nName:\n{{ $('03 - Clean Customer Data').item.json.customerName }}\n\nEmail:\n{{ $('03 - Clean Customer Data').item.json.email }}\n\nMessage:\n{{ $('02 - Validate Request').item.json.body.message }}\n\nYour job:\n\n1. Identify the customer's intent.\n2. Write a helpful professional reply.\n3. Decide if the conversation should be transferred to a human.\n\nIntent must be one of:\n\nFAQ\nLead\nSupport\nComplaint\nHuman\n\nReturn ONLY valid JSON.\n\n{\n  \"intent\":\"\",\n  \"reply\":\"\",\n  \"needsHuman\":false,\n  \"priority\":\"Low\",\n  \"reasoning\":\"\"\n}",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        752,
+        32
+      ],
+      "id": "ada6479b-630e-4fae-81ba-4d901ed348f4",
+      "name": "05 - AI Customer Support",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.text;\n\nconst parsed = JSON.parse(raw);\n\nreturn [\n  {\n    json: {\n      intent: parsed.intent,\n      reply: parsed.reply,\n      needsHuman: parsed.needsHuman,\n      priority: parsed.priority,\n      reasoning: parsed.reasoning\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        32
+      ],
+      "id": "d73aa673-3b4c-4069-9e57-07ac17175952",
+      "name": "06 - Parse AI JSON"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "FAQ",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "00e51490-f86c-4f47-8755-0e7b010e80c2"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "90ea0c26-24bb-4eff-86f0-29c43ddfe163",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "Lead",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "325147f5-6433-416f-bc27-8ad83d70f57b",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "Support",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "f8209916-9e88-40f5-87e4-e877dbc0b6c8",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "Complaint",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "695f19f7-c725-4a9d-ab9f-71717913170a",
+                    "leftValue": "Human",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1328,
+        -16
+      ],
+      "id": "90e51447-2f77-4c4b-8e43-9aa131c394b5",
+      "name": "07 - Route Customer"
+    },
+    {
+      "parameters": {
+        "numberInputs": 5
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1552,
+        -16
+      ],
+      "id": "0f658fd0-1a5e-4301-823d-d342a16f9749",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "authentication": "airtableOAuth2Api",
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appa04wT38PJcLwdW",
+          "mode": "list",
+          "cachedResultName": "Custtomer Support",
+          "cachedResultUrl": "https://airtable.com/appa04wT38PJcLwdW"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblXEeig9J4PpPFiE",
+          "mode": "list",
+          "cachedResultName": "Conversations",
+          "cachedResultUrl": "https://airtable.com/appa04wT38PJcLwdW/tblXEeig9J4PpPFiE"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Conversation ID": "={{ $('04 - Generate Conversation ID').item.json.conversationId }}",
+            "Customer Name": "={{ $('03 - Clean Customer Data').item.json.customerName }}",
+            "Email": "={{ $('03 - Clean Customer Data').item.json.email }}",
+            "AI Reply": "={{ $('07 - Route Customer').item.json.reply }}",
+            "Intent": "={{ $('07 - Route Customer').item.json.intent }}",
+            "Message": "={{ $('02 - Validate Request').item.json.body.message }}",
+            "Phone": "={{ $('03 - Clean Customer Data').item.json.phone }}",
+            "Status": "={{ $('07 - Route Customer').item.json.needsHuman ? 'Escalated' : 'Resolved' }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Conversation ID",
+              "displayName": "Conversation ID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Customer Name",
+              "displayName": "Customer Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Message",
+              "displayName": "Message",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "AI Reply",
+              "displayName": "AI Reply",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Intent",
+              "displayName": "Intent",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Created At",
+              "displayName": "Created At",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        1776,
+        32
+      ],
+      "id": "a79a5c9a-4634-49af-bfe6-2ef97d235805",
+      "name": "09 - Save Conversation",
+      "credentials": {
+        "airtableOAuth2Api": {
+          "id": "HTKgdkMecNpgMRig",
+          "name": "Airtable account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "airtableOAuth2Api",
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appa04wT38PJcLwdW",
+          "mode": "list",
+          "cachedResultName": "Custtomer Support",
+          "cachedResultUrl": "https://airtable.com/appa04wT38PJcLwdW"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tbl616wkFmTGC8zB6",
+          "mode": "list",
+          "cachedResultName": "Workflow Execution",
+          "cachedResultUrl": "https://airtable.com/appa04wT38PJcLwdW/tbl616wkFmTGC8zB6"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Name": "={{ $json.fields['Customer Name'] }}",
+            "Email": "={{ $json.fields.Email }}",
+            "Status": "Success",
+            "Message": "Customer message processed successfully.",
+            "Execution ID": "={{$json.execution.id}}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Execution ID",
+              "displayName": "Execution ID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Message",
+              "displayName": "Message",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        2000,
+        32
+      ],
+      "id": "badc6424-50f2-4786-8c44-81a1161e6d4d",
+      "name": "10 - Success Log",
+      "credentials": {
+        "airtableOAuth2Api": {
+          "id": "HTKgdkMecNpgMRig",
+          "name": "Airtable account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"success\": true,\n  \"reply\": \"{{$json.reply}}\",\n  \"intent\": \"{{$json.intent}}\",\n  \"needsHuman\": \"{{$json.needsHuman}}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2224,
+        32
+      ],
+      "id": "cc98064d-23d6-416f-a2ad-934ed1802c47",
+      "name": "11 - Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"success\": false,\n  \"message\": \"Required fields are missing.\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        304,
+        224
+      ],
+      "id": "95709d91-e166-4797-9780-44bf178a3c16",
+      "name": "03A - Return Response"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "01 - Receive Customer Message": {
+      "main": [
+        [
+          {
+            "node": "02 - Validate Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "02 - Validate Request": {
+      "main": [
+        [
+          {
+            "node": "03 - Clean Customer Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "03A - Return Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "03 - Clean Customer Data": {
+      "main": [
+        [
+          {
+            "node": "04 - Generate Conversation ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "04 - Generate Conversation ID": {
+      "main": [
+        [
+          {
+            "node": "05 - AI Customer Support",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "05 - AI Customer Support",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "05 - AI Customer Support": {
+      "main": [
+        [
+          {
+            "node": "06 - Parse AI JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "06 - Parse AI JSON": {
+      "main": [
+        [
+          {
+            "node": "07 - Route Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "07 - Route Customer": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ],
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 3
+          }
+        ],
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 4
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "09 - Save Conversation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "09 - Save Conversation": {
+      "main": [
+        [
+          {
+            "node": "10 - Success Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "10 - Success Log": {
+      "main": [
+        [
+          {
+            "node": "11 - Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "242c2200-d5a8-48b3-945a-635646c2255e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4749ef1dff9dab97533d296fc60571d1f46847c4cabe69d94e1cae900f679a95"
+  },
+  "nodeGroups": [],
+  "id": "HDZGbAyA7Zc8oRpc",
+  "tags": []
+}
